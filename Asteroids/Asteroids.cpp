@@ -4,18 +4,34 @@
 #include <map>
 #include <vector>
 #include <memory>
+#include <iostream>
 using namespace std;
 
-const int max_asteroid_speed = 3;
-const int max_player_speed = 3;
+const int max_asteroid_speed = 2;
+const int max_player_speed = 2;
 const int big_asteroid_treshold = 3;
+const unsigned int reticle_appearence_treshold = 10000;
+
+struct SpaceObject {
+	Sprite* sprite;
+	double x;
+	double y;
+	double x_acceleration;
+	double y_acceleration;
+};
+
+struct Reticle: SpaceObject {
+	unsigned int first_appearence;
+	unsigned int last_appearence;
+	bool drawStatus;
+};
 
 /* Test Framework realization */
 class MyFramework : public Framework {
 
 public:
 
-	MyFramework(int windows_x = 900, int windows_y = 900, int map_x = 1000, int map_y = 1000, int num_asteroids = 30, int num_ammo = 3) :
+	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 3) :
 		windows_x{ windows_x }, windows_y{ windows_y }, map_x{ map_x }, map_y{ map_y }, num_asteroids{ num_asteroids },
 		num_ammo{ num_ammo }
 	{
@@ -30,21 +46,45 @@ public:
 	}
 
 	virtual bool Init() {
-		player.insert({ {{windows_x / 2, windows_y / 2}, {0, 0}}, createSprite("data\\spaceship.png") });
+
+		reticle.sprite = createSprite("data\\reticle.png");
+		reticle.drawStatus = false;
+		reticle.x = 10;
+		reticle.y = 10;
+
+		// create player
+		player.sprite = createSprite("data\\spaceship.png");
+		player.x = windows_x / 2 - 1;
+		player.y = windows_y / 2 - 1;
+		player.x_acceleration = 0;
+		player.y_acceleration = 0;
+
 		// create and randomly spawn asteroids
 		srand((unsigned)time(0));
-		for (int i = 0, x, y, speed_x, speed_y; i < num_asteroids; ++i) {
+		double x, y, x_acceleration, y_acceleration;
+		asteroids.resize(num_asteroids);
+		for (int i = 0; i < num_asteroids; ++i) {
 			x = rand() % windows_x + windows_x / 10;
 			y = rand() % windows_y + windows_y / 10;
-			speed_x = rand() / max_asteroid_speed;
-			speed_y = rand() / max_asteroid_speed;
+			x_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
+			y_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
 			if (i % big_asteroid_treshold == 0)
-				asteroids.insert({ {{x, y}, {speed_x, speed_y}}, createSprite("data\\big_asteroid.png") });
-			asteroids.insert({ {{x, y}, {speed_x, speed_y}}, createSprite("data\\small_asteroid.png") });
+				asteroids[i].sprite = createSprite("data\\big_asteroid.png");
+			else
+				asteroids[i].sprite = createSprite("data\\small_asteroid.png");
+			asteroids[i].x = x;
+			asteroids[i].y = y;
+			asteroids[i].x_acceleration = x_acceleration;
+			asteroids[i].y_acceleration = y_acceleration;
 		}
 
+		bullets.resize(num_asteroids);
 		for (int i = 0; i < num_ammo; ++i) {
-			bullets.insert({ { {windows_x / 2, windows_y / 2}, {0, 0}}, createSprite("data\\bullet.png") });
+			bullets[i].sprite = createSprite("data\\bullet.png");
+			bullets[i].x = windows_x / 2 - 1;
+			bullets[i].y = windows_y / 2 - 1;
+			bullets[i].x_acceleration = 0;
+			bullets[i].y_acceleration = 0;
 		}
 
 		return true;
@@ -54,51 +94,78 @@ public:
 
 	}
 
-	void checkForBounds(pair<int, int>& position) {
-		position.first += speed_x;
-		if (position.first < 0)
-			position.first = map_x - 1;
-		else if (position.first >= map_x)
-			position.first = 0;
-		position.second += speed_y;
-		if (position.second < 0)
-			position.second = map_y - 1;
-		else if (position.second >= map_y)
-			position.second = 0;
+	void checkForBounds(SpaceObject& object) {
+		if (object.x < 0)
+			object.x = map_x - 1;
+		else if (object.x >= map_x)
+			object.x = 0;
+		if (object.y < 0)
+			object.y = map_y - 1;
+		else if (object.y >= map_y)
+			object.y = 0;
 	}
 
-	void setPlayerSpeedX(int speed_x) {
-		auto p = player.begin();
-		p->first.second.first = speed_x;
-	}
-
-	void setPlayerSpeedY(int speed_y) {
-
+	bool checkForCollisions(const SpaceObject& object1, const SpaceObject& object2) {
+		int object1_tlx, object1_tly, object1_w, object1_h;
+		int object2_tlx, object2_tly, object2_w, object2_h;
+		getSpriteSize(object1.sprite, object1_w, object1_h);
+		getSpriteSize(object2.sprite, object2_w, object2_h);
+		object1_tlx = object1.x - object1_w / 2;
+		object1_tly = object1.y - object1_h / 2;
+		object2_tlx = object2.x - object2_w / 2;
+		object2_tly = object2.y - object2_h / 2;
+		if (object1_tlx < object2_tlx + object2_w &&
+			object1_tlx + object1_w > object2_w &&
+			object1_tly < object2_tly + object2_h &&
+			object1_h + object1_tly > object2_tly)
+			return true;
+		return false;
 	}
 
 	void showReticle(bool state) {
 	}
 
 	virtual bool Tick() {
+
 		drawTestBackground();
 
 		// draw asteroids
-		auto p = asteroids.begin();
-		for (int i = 0; i < num_asteroids; ++i, ++p) {
-			checkForBounds({ p->first.first.first, p->first.first.second });
-			drawSprite(p->second, p->first.first.first, p->first.first.second);
+		for (int i = 0; i < num_asteroids; ++i) {
+			asteroids[i].x += asteroids[i].x_acceleration;
+			asteroids[i].y += asteroids[i].y_acceleration;
+			checkForBounds(asteroids[i]);
+			drawSprite(asteroids[i].sprite, asteroids[i].x, asteroids[i].y);
 		}
 
-		auto px = player.begin();
-		checkForBounds({Players_x, Players_y});
-		drawSprite(px->second, px->first.first.first, px->first.first.first);
+		// draw player
+		player.x += player.x_acceleration;
+		player.y += player.y_acceleration;
+		checkForBounds(player);
+		drawSprite(player.sprite, player.x, player.y);
+		
+		for (int i = 0; i < num_asteroids; ++i) {
+			if (checkForCollisions(asteroids[i], player))
+				cout << "OUPS" << endl;
+		}
+
+		
+		if (reticle.drawStatus) {
+			reticle.last_appearence = getTickCount();
+			drawSprite(reticle.sprite, reticle.x, reticle.y);
+			if (reticle.last_appearence - reticle.first_appearence > reticle_appearence_treshold)
+				reticle.drawStatus = false;
+		}
+		//draw bullets
 		
 		
 		return false;
 	}
 
 	virtual void onMouseMove(int x, int y, int xrelative, int yrelative) {
-		showReticle(true);
+		reticle.x = x;
+		reticle.y = y;
+		reticle.first_appearence = getTickCount();
+		reticle.drawStatus = true;
 	}
 
 	virtual void onMouseButtonClick(FRMouseButton button, bool isReleased) {
@@ -109,40 +176,31 @@ public:
 
 	virtual void onKeyPressed(FRKey k) {
 		if (k == FRKey::UP) {
-			setPlayerSpeedY(-1 * max_player_speed);
-			Tick();
+			player.y_acceleration = -1 * max_player_speed;
 		}
 		else if (k == FRKey::DOWN) {
-			setPlayerSpeedY(max_player_speed);
-			Tick();
+			player.y_acceleration = max_player_speed;
 		}
 		else if (k == FRKey::LEFT) {
-			setPlayerSpeedX(-1 * max_player_speed);
-			Tick();
+			player.x_acceleration = -1 * max_player_speed;
 		}
 		else if (k == FRKey::RIGHT) {
-			setPlayerSpeedX(max_player_speed);
-			Tick();
+			player.x_acceleration = max_player_speed;
 		}
 	}
 
 	virtual void onKeyReleased(FRKey k) {
-		auto p = player.begin();
-		while (p->first.second.first < 0) {
-			++p->first.second.first;
-			Tick();
+		if (k == FRKey::UP) {
+			for (; player.y_acceleration < 0; player.y_acceleration += 0.05);
 		}
-		while (speed_x > 0) {
-			--speed_x;
-			Tick();
+		else if (k == FRKey::DOWN) {
+			for (; player.y_acceleration > 0; player.y_acceleration -= 0.05);
 		}
-		while (speed_y < 0) {
-			++speed_y;
-			Tick();
+		else if (k == FRKey::LEFT) {
+			for (; player.x_acceleration < 0; player.x_acceleration += 0.05);
 		}
-		while (speed_y > 0) {
-			--speed_y;
-			Tick();
+		else if (k == FRKey::RIGHT) {
+			for (; player.x_acceleration > 0; player.x_acceleration -= 0.05);
 		}
 			
 	}
@@ -157,9 +215,10 @@ private:
 	int num_asteroids;
 	int map_x, map_y;
 	int windows_x, windows_y;
-	map<pair<pair<int, int>, pair<int, int>>, Sprite*> player;
-	map<pair<pair<int, int>, pair<int, int>>, Sprite*> asteroids;
-	map<pair<pair<int, int>, pair<int, int>>, Sprite*> bullets;
+	Reticle reticle;
+	SpaceObject player;
+	vector<SpaceObject> asteroids;
+	vector<SpaceObject> bullets;
 };
 
 int main(int argc, char* argv[])

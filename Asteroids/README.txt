@@ -3,13 +3,13 @@ Hello!
 Your task is to implement *simple* asteroids-like game
 (please, see Asteroids (1979) arcade game for a reference if you like)
 
-+Asteroids should be spawned randomly on a map but not too close to the player (make a threshold). They have random impulse that set the movement
++-Asteroids should be spawned randomly on a map but not too close to the player (make a threshold). They have random impulse that set the movement
 -Asteroids can not pass through each other and should fly apart after collision (look Brownian motion for reference)
 +There are two types of asteroids: big and small
--Once the asteroid touches player, the player dies and game restarts
++-Once the asteroid touches player, the player dies and game restarts
 
-+You should be able to move your avatar with left/right/up/down buttons. Input gives to player a maximum speed, after input is released speed should decreases over time (inertia).
--Have a reticle following mouse button
++-You should be able to move your avatar with left/right/up/down buttons. Input gives to player a maximum speed, after input is released speed should decreases over time (inertia).
++Have a reticle following mouse button
 -Player can shoot (e.g. by pressing left mouse button).
 -Once it is pressed, a bullet should move at the given direction.
 -If bullet is intersected with small asteroid, both asteroid and bullet should be destroyed.
@@ -19,7 +19,7 @@ Your task is to implement *simple* asteroids-like game
 -Player should always be in the center of a screen (i.e. if it moves map is recentered). You can add extra threshold, but it is not necessary
 
 +Everything "wrap around" the screen. This means if player goes past the edge of the map, he will reappear on the opposite side traveling the same direction. 
--The same goes fo the asteoids and player bullets.
++-The same goes fo the asteoids and player bullets.
 
 ***
 Additional improvements.
