@@ -21,6 +21,10 @@ struct SpaceObject {
 	double y_acceleration;
 };
 
+struct Asteroid : SpaceObject {
+	bool small_size;
+};
+
 struct Reticle: SpaceObject {
 	unsigned int first_appearence;
 	unsigned int last_appearence;
@@ -30,7 +34,7 @@ struct Reticle: SpaceObject {
 struct Bullet : SpaceObject {
 	unsigned int first_appearence;
 	unsigned int last_appearence;
-	bool shooted;
+	bool drawStatus;
 };
 
 /* Test Framework realization */
@@ -38,7 +42,7 @@ class MyFramework : public Framework {
 
 public:
 
-	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 10) :
+	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 50) :
 		windows_x{ windows_x }, windows_y{ windows_y }, map_x{ map_x }, map_y{ map_y }, num_asteroids{ num_asteroids },
 		num_ammo{ num_ammo }
 	{
@@ -74,10 +78,14 @@ public:
 			y = rand() % windows_y + windows_y / 10;
 			x_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
 			y_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
-			if (i % big_asteroid_treshold == 0)
+			if (i % big_asteroid_treshold == 0) {
 				asteroids[i].sprite = createSprite("data\\big_asteroid.png");
-			else
+				asteroids[i].small_size = false;
+			}
+			else {
 				asteroids[i].sprite = createSprite("data\\small_asteroid.png");
+				asteroids[i].small_size = true;
+			}
 			asteroids[i].x = x;
 			asteroids[i].y = y;
 			asteroids[i].x_acceleration = x_acceleration;
@@ -92,7 +100,7 @@ public:
 			bullets[i].y = windows_y / 2 - 1;
 			bullets[i].x_acceleration = 0;
 			bullets[i].y_acceleration = 0;
-			bullets[i].shooted = false;
+			bullets[i].drawStatus = false;
 		}
 
 		return true;
@@ -135,7 +143,7 @@ public:
 		drawTestBackground();
 
 		// draw asteroids
-		for (int i = 0; i < num_asteroids; ++i) {
+		for (int i = 0; i < asteroids.size(); ++i) {
 			asteroids[i].x += asteroids[i].x_acceleration;
 			asteroids[i].y += asteroids[i].y_acceleration;
 			checkForBounds(asteroids[i]);
@@ -158,7 +166,7 @@ public:
 
 		//draw bullets
 		for (int i = 0; i < bullets.size() ; ++i) {
-			if (bullets[i].shooted) {
+			if (bullets[i].drawStatus) {
 				bullets[i].last_appearence = getTickCount();
 				if (bullets[i].last_appearence - bullets[i].first_appearence > bullets_appearence_treshold) {
 					// TODO
@@ -175,13 +183,56 @@ public:
 
 		}
 
+		// check for collisions between asteroids and bullets
+		for (int i = 0; i < asteroids.size(); ++i) {
+			for (int k = 0; k < bullets.size(); ++k) {
+				if (bullets[k].drawStatus == true && checkForCollisions(asteroids[i], bullets[k])) {
+					if (asteroids[i].small_size == true) {
+						asteroids.erase(asteroids.begin() + i);
+						bullets.erase(bullets.begin() + k);
+					}
+					else {
+
+						Asteroid temp_asteroid;
+						srand((unsigned)time(0));
+
+						double x, y, x_acceleration, y_acceleration;
+						x = asteroids[i].x;
+						y = asteroids[i].y;
+						x_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
+						y_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
+						temp_asteroid.sprite = createSprite("data\\small_asteroid.png");
+						temp_asteroid.small_size = true;
+						temp_asteroid.x = x;
+						temp_asteroid.y = y;
+						temp_asteroid.x_acceleration = x_acceleration;
+						temp_asteroid.y_acceleration = y_acceleration;
+						asteroids.push_back(temp_asteroid);
+
+						x = asteroids[i].x + 1;
+						y = asteroids[i].y + 1;
+						x_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
+						y_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
+						temp_asteroid.sprite = createSprite("data\\small_asteroid.png");
+						temp_asteroid.small_size = true;
+						temp_asteroid.x = x;
+						temp_asteroid.y = y;
+						temp_asteroid.x_acceleration = x_acceleration;
+						temp_asteroid.y_acceleration = y_acceleration;
+						asteroids.push_back(temp_asteroid);
+						
+						bullets.erase(bullets.begin() + k);
+						asteroids.erase(asteroids.begin() + i);
+					}
+				}
+			}
+		}
+
 		// check for collisions between asteroids and player
-		for (int i = 0; i < num_asteroids; ++i) {
+		for (int i = 0; i < asteroids.size(); ++i) {
 			if (checkForCollisions(asteroids[i], player))
 				Init();
 		}
-
-		// check for collisions between asteroids and bullets
 
 		return false;
 	}
@@ -198,7 +249,7 @@ public:
 		if (button == FRMouseButton::LEFT && state == false) {
 			state = true;
 			if (num_ammo > 0) {
-				bullets[num_ammo - 1].shooted = true;
+				bullets[num_ammo - 1].drawStatus = true;
 				bullets[num_ammo - 1].first_appearence = getTickCount();
 				bullets[num_ammo - 1].x_acceleration = (reticle.x - player.x) / player.x;
 				bullets[num_ammo - 1].y_acceleration = (reticle.y - player.y) / player.y;
@@ -253,7 +304,7 @@ private:
 	Reticle reticle;
 	SpaceObject player;
 	vector<Bullet> bullets;
-	vector<SpaceObject> asteroids;
+	vector<Asteroid> asteroids;
 };
 
 int main(int argc, char* argv[])

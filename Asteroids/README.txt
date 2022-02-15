@@ -12,8 +12,8 @@ Your task is to implement *simple* asteroids-like game
 +Have a reticle following mouse button
 +Player can shoot (e.g. by pressing left mouse button).
 +Once it is pressed, a bullet should move at the given direction.
--If bullet is intersected with small asteroid, both asteroid and bullet should be destroyed.
--If bullet is intersected with big asteroid, big asteroid break up into 2 small asteroids and bullet should be destroyed.
++If bullet is intersected with small asteroid, both asteroid and bullet should be destroyed.
++If bullet is intersected with big asteroid, big asteroid break up into 2 small asteroids and bullet should be destroyed.
 -If there are no ammo, then oldest bullet should disappear and new one should be spawned
 
 -Player should always be in the center of a screen (i.e. if it moves map is recentered). You can add extra threshold, but it is not necessary
