@@ -8,13 +8,13 @@ Your task is to implement *simple* asteroids-like game
 +There are two types of asteroids: big and small
 +Once the asteroid touches player, the player dies and game restarts
 
-+-You should be able to move your avatar with left/right/up/down buttons. Input gives to player a maximum speed, after input is released speed should decreases over time (inertia).
++You should be able to move your avatar with left/right/up/down buttons. Input gives to player a maximum speed, after input is released speed should decreases over time (inertia).
 +Have a reticle following mouse button
 +Player can shoot (e.g. by pressing left mouse button).
-+-Once it is pressed, a bullet should move at the given direction.
++Once it is pressed, a bullet should move at the given direction.
 +If bullet is intersected with small asteroid, both asteroid and bullet should be destroyed.
 +If bullet is intersected with big asteroid, big asteroid break up into 2 small asteroids and bullet should be destroyed.
--If there are no ammo, then oldest bullet should disappear and new one should be spawned
++If there are no ammo, then oldest bullet should disappear and new one should be spawned
 
 -Player should always be in the center of a screen (i.e. if it moves map is recentered). You can add extra threshold, but it is not necessary
 

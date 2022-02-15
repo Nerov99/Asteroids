@@ -9,7 +9,7 @@
 #include <random>
 
 const double max_asteroid_speed = 0.5;
-const int spawn_distance_treshold = 20;
+const int spawn_distance_treshold = 40;
 const int max_player_speed = 2;
 const int big_asteroid_probability_treshold = 3;
 const unsigned int reticle_appearence_treshold = 10000;
@@ -19,11 +19,17 @@ struct SpaceObject {
 	Sprite* sprite;
 	double x;
 	double y;
+};
+
+struct Spaceship : SpaceObject {
 	double x_acceleration;
 	double y_acceleration;
+	bool engine_state;
 };
 
 struct Asteroid : SpaceObject {
+	double x_acceleration;
+	double y_acceleration;
 	bool small_size;
 };
 
@@ -34,6 +40,8 @@ struct Reticle: SpaceObject {
 };
 
 struct Bullet : SpaceObject {
+	double x_acceleration;
+	double y_acceleration;
 	unsigned int first_appearence;
 	unsigned int last_appearence;
 	bool drawStatus;
@@ -57,7 +65,7 @@ class MyFramework : public Framework {
 
 public:
 
-	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 50) :
+	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 5) :
 		windows_x{ windows_x }, windows_y{ windows_y }, map_x{ map_x }, map_y{ map_y }, num_asteroids{ num_asteroids },
 		num_ammo{ num_ammo }
 	{
@@ -84,6 +92,7 @@ public:
 		player.y = windows_y / 2 - 1;
 		player.x_acceleration = 0;
 		player.y_acceleration = 0;
+		player.engine_state = false;
 
 		// create asteroids
 		srand((unsigned)time(0));
@@ -117,6 +126,7 @@ public:
 
 		// create bullets
 		bullets.resize(num_ammo);
+		bullets_count = 0;
 		for (int i = 0; i < num_ammo; ++i) {
 			bullets[i].sprite = createSprite("data\\bullet.png");
 			bullets[i].x = windows_x / 2 - 1;
@@ -142,6 +152,14 @@ public:
 			object.y = map_y - 1;
 		else if (object.y >= map_y)
 			object.y = 0;
+	}
+
+	// TODO
+	// This function will return right acceleration for bullets (equal speed in all direction and independent from reticle distance to player)
+	// Function, probably, should be realized by finding common point between circle(center = player and radius = bullets speed) and line(player to reticle)
+	// Will be implemented in next releaze
+	std::pair<double, double> getBulletAcceleration(double x0, double y0, double x1, double y1) {
+		return {0, 0};
 	}
 
 	bool checkForCollisions(const SpaceObject& object1, const SpaceObject& object2) {
@@ -174,6 +192,28 @@ public:
 		}
 
 		// draw player
+		if (player.engine_state == false && (player.x_acceleration != 0 || player.y_acceleration != 0)) {
+			if (player.x_acceleration < 0) {
+				if (player.x_acceleration > -0.001 && player.x_acceleration < 0.001)
+					player.x_acceleration = 0;
+				player.x_acceleration += max_player_speed / 40.;
+			}
+			else if (player.x_acceleration > 0) {
+				if (player.x_acceleration > -0.001 && player.x_acceleration < 0.001)
+					player.x_acceleration = 0;
+				player.x_acceleration -= max_player_speed / 40.;
+			}
+			if (player.y_acceleration < 0) {
+				if (player.y_acceleration > -0.001 && player.y_acceleration < 0.001)
+					player.y_acceleration = 0;
+				player.y_acceleration += max_player_speed / 40.;
+			}
+			else if (player.y_acceleration > 0) {
+				if (player.y_acceleration > -0.001 && player.y_acceleration < 0.001)
+					player.y_acceleration = 0;
+				player.y_acceleration -= max_player_speed / 40.;
+			}
+		}
 		player.x += player.x_acceleration;
 		player.y += player.y_acceleration;
 		checkForBounds(player);
@@ -190,10 +230,6 @@ public:
 		//draw bullets
 		for (int i = 0; i < bullets.size() ; ++i) {
 			if (bullets[i].drawStatus) {
-				bullets[i].last_appearence = getTickCount();
-				if (bullets[i].last_appearence - bullets[i].first_appearence > bullets_appearence_treshold) {
-					// TODO
-				}
 				bullets[i].x += bullets[i].x_acceleration;
 				bullets[i].y += bullets[i].y_acceleration;
 				checkForBounds(bullets[i]);
@@ -203,7 +239,6 @@ public:
 				bullets[i].x = player.x;
 				bullets[i].y = player.y;
 			}
-
 		}
 
 		// check for collisions between asteroids and bullets
@@ -212,7 +247,6 @@ public:
 				if (bullets[k].drawStatus == true && checkForCollisions(asteroids[i], bullets[k])) {
 					if (asteroids[i].small_size == true) {
 						asteroids.erase(asteroids.begin() + i);
-						bullets.erase(bullets.begin() + k);
 					}
 					else {
 
@@ -242,10 +276,12 @@ public:
 						temp_asteroid.x_acceleration = -1 * x_acceleration;
 						temp_asteroid.y_acceleration = -1 * y_acceleration;
 						asteroids.push_back(temp_asteroid);
-						
-						bullets.erase(bullets.begin() + k);
+
+						destroySprite(asteroids[i].sprite);
 						asteroids.erase(asteroids.begin() + i);
 					}
+					bullets[k].drawStatus = false;
+					--bullets_count;
 				}
 			}
 		}
@@ -291,11 +327,11 @@ public:
 		}
 
 		// check for collisions between asteroids and player
-		for (int i = 0; i < asteroids.size(); ++i) {
+		/*for (int i = 0; i < asteroids.size(); ++i) {
 			if (checkForCollisions(asteroids[i], player))
 				Init();
 		}
-
+		*/
 		return false;
 	}
 
@@ -308,16 +344,32 @@ public:
 
 	virtual void onMouseButtonClick(FRMouseButton button, bool isReleased) {
 		static bool state = false;
+		int k = 0;
 		if (button == FRMouseButton::LEFT && state == false) {
 			state = true;
-			if (num_ammo > 0) {
-				bullets[num_ammo - 1].drawStatus = true;
-				bullets[num_ammo - 1].first_appearence = getTickCount();
-				bullets[num_ammo - 1].x_acceleration = (reticle.x - player.x) / player.x;
-				bullets[num_ammo - 1].y_acceleration = (reticle.y - player.y) / player.y;
-				--num_ammo;
+			if (bullets_count >= num_ammo) {
+				for (int i = 0; i < bullets.size(); ++i) {
+					if (bullets[i].drawStatus == true)
+						if (bullets[k].first_appearence > bullets[i].first_appearence)
+							k = i;
+				}
+				bullets[k].drawStatus = false;
+				--bullets_count;
 			}
-		}
+			for (int i = 0; i < bullets.size(); ++i) {
+				if (bullets[i].drawStatus == false) {
+					k = i;
+					break;
+				}
+			}
+			bullets[k].x = player.x;
+			bullets[k].y = player.y;
+			bullets[k].drawStatus = true;
+			bullets[k].first_appearence = getTickCount();
+			bullets[k].x_acceleration = (reticle.x - player.x) / player.x;
+			bullets[k].y_acceleration = (reticle.y - player.y) / player.y;
+			++bullets_count;
+			}
 		else if (button == FRMouseButton::LEFT && state == true)
 			state = false;
 	}
@@ -326,31 +378,20 @@ public:
 		if (k == FRKey::UP) {
 			player.y_acceleration = -1 * max_player_speed;
 		}
-		else if (k == FRKey::DOWN) {
+		if (k == FRKey::DOWN) {
 			player.y_acceleration = max_player_speed;
 		}
-		else if (k == FRKey::LEFT) {
+		if (k == FRKey::LEFT) {
 			player.x_acceleration = -1 * max_player_speed;
 		}
-		else if (k == FRKey::RIGHT) {
+		if (k == FRKey::RIGHT) {
 			player.x_acceleration = max_player_speed;
 		}
+		player.engine_state = true;
 	}
-	// TODO
+
 	virtual void onKeyReleased(FRKey k) {
-		if (k == FRKey::UP) {
-			for (; player.y_acceleration < 0; player.y_acceleration += 0.1);
-		}
-		else if (k == FRKey::DOWN) {
-			for (; player.y_acceleration > 0; player.y_acceleration -= 0.05);
-		}
-		else if (k == FRKey::LEFT) {
-			for (; player.x_acceleration < 0; player.x_acceleration += 0.05);
-		}
-		else if (k == FRKey::RIGHT) {
-			for (; player.x_acceleration > 0; player.x_acceleration -= 0.05);
-		}
-			
+		player.engine_state = false;
 	}
 
 	virtual const char* GetTitle() override
@@ -360,16 +401,36 @@ public:
 
 private:
 	int num_ammo;
+	int bullets_count;
 	int num_asteroids;
 	int map_x, map_y;
 	int windows_x, windows_y;
 	Reticle reticle;
-	SpaceObject player;
+	Spaceship player;
 	std::vector<Bullet> bullets;
 	std::vector<Asteroid> asteroids;
 };
 
 int main(int argc, char* argv[])
 {
+	/*int windows_x, windows_y;
+	int map_x, map_y;
+	int num_asteroids, num_ammo;
+	for (int i = 0; i < argc; ++i) {
+		if (argv[i] == "-window") {
+			windows_x = ;
+			windows_y = ;
+		}
+		else if (argv[i] == "-map") {
+			map_x = ;
+			map_y = ;
+		}
+		else if (argv[i] == "-num_asteroids") {
+			num_asteroids = ;
+		}
+		else if (argv[i] == "-num_ammo") {
+			num_ammo = ;
+		}
+	}*/
 	return run(new MyFramework());
 }
