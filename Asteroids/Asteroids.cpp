@@ -11,6 +11,7 @@ const int max_asteroid_speed = 2;
 const int max_player_speed = 2;
 const int big_asteroid_treshold = 3;
 const unsigned int reticle_appearence_treshold = 10000;
+const unsigned int bullets_appearence_treshold = 2000;
 
 struct SpaceObject {
 	Sprite* sprite;
@@ -26,12 +27,18 @@ struct Reticle: SpaceObject {
 	bool drawStatus;
 };
 
+struct Bullet : SpaceObject {
+	unsigned int first_appearence;
+	unsigned int last_appearence;
+	bool shooted;
+};
+
 /* Test Framework realization */
 class MyFramework : public Framework {
 
 public:
 
-	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 3) :
+	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 10) :
 		windows_x{ windows_x }, windows_y{ windows_y }, map_x{ map_x }, map_y{ map_y }, num_asteroids{ num_asteroids },
 		num_ammo{ num_ammo }
 	{
@@ -47,10 +54,9 @@ public:
 
 	virtual bool Init() {
 
+		//create reticle
 		reticle.sprite = createSprite("data\\reticle.png");
 		reticle.drawStatus = false;
-		reticle.x = 10;
-		reticle.y = 10;
 
 		// create player
 		player.sprite = createSprite("data\\spaceship.png");
@@ -59,7 +65,7 @@ public:
 		player.x_acceleration = 0;
 		player.y_acceleration = 0;
 
-		// create and randomly spawn asteroids
+		// create asteroids
 		srand((unsigned)time(0));
 		double x, y, x_acceleration, y_acceleration;
 		asteroids.resize(num_asteroids);
@@ -78,13 +84,15 @@ public:
 			asteroids[i].y_acceleration = y_acceleration;
 		}
 
-		bullets.resize(num_asteroids);
+		// create bullets
+		bullets.resize(num_ammo);
 		for (int i = 0; i < num_ammo; ++i) {
 			bullets[i].sprite = createSprite("data\\bullet.png");
 			bullets[i].x = windows_x / 2 - 1;
 			bullets[i].y = windows_y / 2 - 1;
 			bullets[i].x_acceleration = 0;
 			bullets[i].y_acceleration = 0;
+			bullets[i].shooted = false;
 		}
 
 		return true;
@@ -115,14 +123,11 @@ public:
 		object2_tlx = object2.x - object2_w / 2;
 		object2_tly = object2.y - object2_h / 2;
 		if (object1_tlx < object2_tlx + object2_w &&
-			object1_tlx + object1_w > object2_w &&
+			object1_tlx + object1_w > object2_tlx &&
 			object1_tly < object2_tly + object2_h &&
-			object1_h + object1_tly > object2_tly)
+			object1_tly + object1_h > object2_tly)
 			return true;
 		return false;
-	}
-
-	void showReticle(bool state) {
 	}
 
 	virtual bool Tick() {
@@ -142,22 +147,42 @@ public:
 		player.y += player.y_acceleration;
 		checkForBounds(player);
 		drawSprite(player.sprite, player.x, player.y);
-		
-		for (int i = 0; i < num_asteroids; ++i) {
-			if (checkForCollisions(asteroids[i], player))
-				cout << "OUPS" << endl;
-		}
 
-		
+		// draw reticle
 		if (reticle.drawStatus) {
 			reticle.last_appearence = getTickCount();
 			drawSprite(reticle.sprite, reticle.x, reticle.y);
 			if (reticle.last_appearence - reticle.first_appearence > reticle_appearence_treshold)
 				reticle.drawStatus = false;
 		}
+
 		//draw bullets
-		
-		
+		for (int i = 0; i < bullets.size() ; ++i) {
+			if (bullets[i].shooted) {
+				bullets[i].last_appearence = getTickCount();
+				if (bullets[i].last_appearence - bullets[i].first_appearence > bullets_appearence_treshold) {
+					// TODO
+				}
+				bullets[i].x += bullets[i].x_acceleration;
+				bullets[i].y += bullets[i].y_acceleration;
+				checkForBounds(bullets[i]);
+				drawSprite(bullets[i].sprite, bullets[i].x, bullets[i].y);
+			}
+			else {
+				bullets[i].x = player.x;
+				bullets[i].y = player.y;
+			}
+
+		}
+
+		// check for collisions between asteroids and player
+		for (int i = 0; i < num_asteroids; ++i) {
+			if (checkForCollisions(asteroids[i], player))
+				Init();
+		}
+
+		// check for collisions between asteroids and bullets
+
 		return false;
 	}
 
@@ -169,9 +194,19 @@ public:
 	}
 
 	virtual void onMouseButtonClick(FRMouseButton button, bool isReleased) {
-		if (button == FRMouseButton::LEFT) {
-
+		static bool state = false;
+		if (button == FRMouseButton::LEFT && state == false) {
+			state = true;
+			if (num_ammo > 0) {
+				bullets[num_ammo - 1].shooted = true;
+				bullets[num_ammo - 1].first_appearence = getTickCount();
+				bullets[num_ammo - 1].x_acceleration = (reticle.x - player.x) / player.x;
+				bullets[num_ammo - 1].y_acceleration = (reticle.y - player.y) / player.y;
+				--num_ammo;
+			}
 		}
+		else if (button == FRMouseButton::LEFT && state == true)
+			state = false;
 	}
 
 	virtual void onKeyPressed(FRKey k) {
@@ -188,10 +223,10 @@ public:
 			player.x_acceleration = max_player_speed;
 		}
 	}
-
+	// TODO
 	virtual void onKeyReleased(FRKey k) {
 		if (k == FRKey::UP) {
-			for (; player.y_acceleration < 0; player.y_acceleration += 0.05);
+			for (; player.y_acceleration < 0; player.y_acceleration += 0.1);
 		}
 		else if (k == FRKey::DOWN) {
 			for (; player.y_acceleration > 0; player.y_acceleration -= 0.05);
@@ -217,8 +252,8 @@ private:
 	int windows_x, windows_y;
 	Reticle reticle;
 	SpaceObject player;
+	vector<Bullet> bullets;
 	vector<SpaceObject> asteroids;
-	vector<SpaceObject> bullets;
 };
 
 int main(int argc, char* argv[])
