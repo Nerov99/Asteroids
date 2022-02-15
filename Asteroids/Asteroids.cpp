@@ -11,7 +11,7 @@
 #include <random>
 
 const double max_asteroid_speed = 0.5;
-const unsigned short int spawn_distance_treshold = 40;
+const unsigned short int spawn_distance_treshold = 100;
 const unsigned short int max_player_speed = 2;
 const double player_acceleration_multiplier = 60;
 const unsigned short int big_asteroid_probability_treshold = 3;
@@ -70,7 +70,7 @@ class MyFramework : public Framework {
 
 public:
 
-	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 50, int num_ammo = 7) :
+	MyFramework(int windows_x = 1920, int windows_y = 1080, int map_x = 1920, int map_y = 1080, int num_asteroids = 30, int num_ammo = 7) :
 		windows_x{ windows_x }, windows_y{ windows_y }, map_x{ map_x }, map_y{ map_y }, num_asteroids{ num_asteroids }, num_ammo{ num_ammo }
 	{}
 
@@ -93,9 +93,26 @@ public:
 
 	}
 
+	void drawBackground() {
+		background = std::make_unique<SpaceObject>();
+		background->sprite = createSprite("data\\background.png");
+		int w, h;
+		getSpriteSize(background->sprite, w ,h);
+		int pos_x = 0;
+		int pos_y = 0;
+		for (size_t i = 0; i < windows_y / h + 1; ++i) {
+			for (size_t k = 0; k < windows_x / w + 1; ++k) {
+				drawSprite(background->sprite, pos_x, pos_y);
+				pos_x += w;
+			}
+			pos_x = 0;
+			pos_y += h;
+		}
+	}
+
 	virtual bool Tick() {
 
-		drawTestBackground();
+		drawBackground();
 
 		drawAsteroids();
 
@@ -127,7 +144,7 @@ public:
 		if (button == FRMouseButton::LEFT && state == false) {
 			state = true;
 			if (bullets_count >= num_ammo) {
-				for (int i = 0; i < bullets.size(); ++i) {
+				for (size_t i = 0; i < bullets.size(); ++i) {
 					if (bullets[i]->drawStatus == true)
 						if (bullets[k]->first_appearence > bullets[i]->first_appearence)
 							k = i;
@@ -135,7 +152,7 @@ public:
 				bullets[k]->drawStatus = false;
 				--bullets_count;
 			}
-			for (int i = 0; i < bullets.size(); ++i) {
+			for (size_t i = 0; i < bullets.size(); ++i) {
 				if (bullets[i]->drawStatus == false) {
 					k = i;
 					break;
@@ -184,6 +201,7 @@ private:
 	int num_asteroids;
 	int map_x, map_y;
 	int windows_x, windows_y;
+	std::unique_ptr<SpaceObject> background;
 	std::unique_ptr<Reticle> reticle;
 	std::unique_ptr<Spaceship> player;
 	std::vector<std::unique_ptr<Bullet>> bullets;
@@ -193,7 +211,7 @@ private:
 		Rand_double rd{ 0, max_asteroid_speed };
 		srand((unsigned)time(0));
 		asteroids.resize(num_asteroids);
-		for (int i = 0; i < num_asteroids; ++i) {
+		for (size_t i = 0; i < num_asteroids; ++i) {
 			asteroids[i] = std::make_unique<Asteroid>();
 			if (rand() % 2 == 1)
 				asteroids[i]->x = player->x + spawn_distance_treshold + rand() % (windows_x - static_cast<int>(player->x) + spawn_distance_treshold);
@@ -235,7 +253,7 @@ private:
 	void createBullets() {
 		bullets.resize(num_ammo);
 		bullets_count = 0;
-		for (int i = 0; i < num_ammo; ++i) {
+		for (size_t i = 0; i < num_ammo; ++i) {
 			bullets[i] = std::make_unique<Bullet>();
 			bullets[i]->sprite = createSprite("data\\bullet.png");
 			bullets[i]->x = windows_x / 2 - 1;
@@ -282,7 +300,7 @@ private:
 	}
 
 	void drawAsteroids() {
-		for (int i = 0; i < asteroids.size(); ++i) {
+		for (size_t i = 0; i < asteroids.size(); ++i) {
 			asteroids[i]->x += asteroids[i]->x_acceleration;
 			asteroids[i]->y += asteroids[i]->y_acceleration;
 			checkForBounds(asteroids[i]);
@@ -332,7 +350,7 @@ private:
 	}
 
 	void drawBullets() {
-		for (int i = 0; i < bullets.size(); ++i) {
+		for (size_t i = 0; i < bullets.size(); ++i) {
 			if (bullets[i]->drawStatus) {
 				bullets[i]->x += bullets[i]->x_acceleration;
 				bullets[i]->y += bullets[i]->y_acceleration;
@@ -347,8 +365,8 @@ private:
 	}
 
 	void collisionBetweenAsteroidsAndBullets() {
-		for (int i = 0; i < asteroids.size(); ++i) {
-			for (int k = 0; k < bullets.size(); ++k) {
+		for (size_t i = 0; i < asteroids.size(); ++i) {
+			for (size_t k = 0; k < bullets.size(); ++k) {
 				if (i >= asteroids.size())
 					break;
 				if (bullets[k]->drawStatus == true && checkForCollisions(asteroids[i], bullets[k])) {
@@ -383,8 +401,8 @@ private:
 	}
 
 	void collisionsBetweenAsteroids() {
-		for (int i = 0; i < asteroids.size(); ++i) {
-			for (int k = 0; k < asteroids.size(); ++k) {
+		for (size_t i = 0; i < asteroids.size(); ++i) {
+			for (size_t k = 0; k < asteroids.size(); ++k) {
 				if (i != k && checkForCollisions(asteroids[i], asteroids[k]) == true) {
 					srand((unsigned)time(0));
 					int variant = rand() % 5;
@@ -428,7 +446,7 @@ private:
 	}
 
 	void collisionsBetweenAsteroidsAndPlayer() {
-		for (int i = 0; i < asteroids.size(); ++i) {
+		for (size_t i = 0; i < asteroids.size(); ++i) {
 			if (checkForCollisions(asteroids[i], player))
 				Init();
 		}
