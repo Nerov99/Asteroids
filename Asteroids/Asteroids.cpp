@@ -5,11 +5,13 @@
 #include <vector>
 #include <memory>
 #include <iostream>
-using namespace std;
+#include <functional>
+#include <random>
 
-const int max_asteroid_speed = 2;
+const double max_asteroid_speed = 0.5;
+const int spawn_distance_treshold = 20;
 const int max_player_speed = 2;
-const int big_asteroid_treshold = 3;
+const int big_asteroid_probability_treshold = 3;
 const unsigned int reticle_appearence_treshold = 10000;
 const unsigned int bullets_appearence_treshold = 2000;
 
@@ -37,6 +39,19 @@ struct Bullet : SpaceObject {
 	bool drawStatus;
 };
 
+class Rand_double {
+public:
+	Rand_double(double low, double high)
+		:r(std::bind(std::uniform_real_distribution<>(low, high), std::default_random_engine())) {
+
+	}
+
+	double operator()() { return r(); }
+
+private:
+	std::function<double()> r;
+};
+
 /* Test Framework realization */
 class MyFramework : public Framework {
 
@@ -58,6 +73,7 @@ public:
 
 	virtual bool Init() {
 
+		Rand_double rd{ 0, max_asteroid_speed };
 		//create reticle
 		reticle.sprite = createSprite("data\\reticle.png");
 		reticle.drawStatus = false;
@@ -71,14 +87,21 @@ public:
 
 		// create asteroids
 		srand((unsigned)time(0));
-		double x, y, x_acceleration, y_acceleration;
+		int x, y;
+		double x_acceleration, y_acceleration;
 		asteroids.resize(num_asteroids);
 		for (int i = 0; i < num_asteroids; ++i) {
-			x = rand() % windows_x + windows_x / 10;
-			y = rand() % windows_y + windows_y / 10;
-			x_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
-			y_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
-			if (i % big_asteroid_treshold == 0) {
+			if(rand() % 2 == 1)
+				x = player.x + spawn_distance_treshold + rand() % (windows_x - static_cast<int>(player.x) + spawn_distance_treshold);
+			else
+				x = player.x - spawn_distance_treshold - rand() % (windows_x - static_cast<int>(player.x) - spawn_distance_treshold);
+			if (rand() % 2 == 1)
+				y = player.y + spawn_distance_treshold + rand() % (windows_y - static_cast<int>(player.y) + spawn_distance_treshold);
+			else
+				y = player.y - spawn_distance_treshold - rand() % (windows_y - static_cast<int>(player.y) - spawn_distance_treshold);
+			x_acceleration = rd();
+			y_acceleration = rd();
+			if (i % big_asteroid_probability_treshold == 0) {
 				asteroids[i].sprite = createSprite("data\\big_asteroid.png");
 				asteroids[i].small_size = false;
 			}
@@ -122,8 +145,8 @@ public:
 	}
 
 	bool checkForCollisions(const SpaceObject& object1, const SpaceObject& object2) {
-		int object1_tlx, object1_tly, object1_w, object1_h;
-		int object2_tlx, object2_tly, object2_w, object2_h;
+		int object2_w, object2_h, object1_w, object1_h;
+		double object1_tlx, object1_tly, object2_tlx, object2_tly;
 		getSpriteSize(object1.sprite, object1_w, object1_h);
 		getSpriteSize(object2.sprite, object2_w, object2_h);
 		object1_tlx = object1.x - object1_w / 2;
@@ -194,13 +217,12 @@ public:
 					else {
 
 						Asteroid temp_asteroid;
-						srand((unsigned)time(0));
-
+						Rand_double rd{ 0, max_asteroid_speed };
 						double x, y, x_acceleration, y_acceleration;
 						x = asteroids[i].x;
 						y = asteroids[i].y;
-						x_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
-						y_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
+						x_acceleration = rd();
+						y_acceleration = rd();
 						temp_asteroid.sprite = createSprite("data\\small_asteroid.png");
 						temp_asteroid.small_size = true;
 						temp_asteroid.x = x;
@@ -211,19 +233,59 @@ public:
 
 						x = asteroids[i].x + 1;
 						y = asteroids[i].y + 1;
-						x_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
-						y_acceleration = rand() % max_asteroid_speed + rand() % max_asteroid_speed / 10.;
+						x_acceleration = rd();
+						y_acceleration = rd();
 						temp_asteroid.sprite = createSprite("data\\small_asteroid.png");
 						temp_asteroid.small_size = true;
 						temp_asteroid.x = x;
 						temp_asteroid.y = y;
-						temp_asteroid.x_acceleration = x_acceleration;
-						temp_asteroid.y_acceleration = y_acceleration;
+						temp_asteroid.x_acceleration = -1 * x_acceleration;
+						temp_asteroid.y_acceleration = -1 * y_acceleration;
 						asteroids.push_back(temp_asteroid);
 						
 						bullets.erase(bullets.begin() + k);
 						asteroids.erase(asteroids.begin() + i);
 					}
+				}
+			}
+		}
+
+		// check for collisions between asteroids
+		for (int i = 0; i < asteroids.size(); ++i) {
+			for (int k = 0; k < asteroids.size(); ++k) {
+				if (i != k && checkForCollisions(asteroids[i], asteroids[k]) == true) {
+					srand((unsigned)time(0));
+					int variant = rand() % 5;
+					if (variant == 0) {
+						asteroids[i].x_acceleration = -1 * asteroids[i].x_acceleration;
+						asteroids[i].y_acceleration = -1 * asteroids[i].y_acceleration;
+						asteroids[k].x_acceleration = -1 * asteroids[k].x_acceleration;
+						asteroids[k].y_acceleration = -1 * asteroids[k].y_acceleration;
+					} else
+					if (variant == 1) {
+						asteroids[i].y_acceleration = -1 * asteroids[i].y_acceleration;
+						asteroids[k].x_acceleration = -1 * asteroids[k].x_acceleration;
+						asteroids[k].y_acceleration = -1 * asteroids[k].y_acceleration;
+					} else
+					if (variant == 2) {
+						asteroids[i].x_acceleration = -1 * asteroids[i].x_acceleration;
+						asteroids[k].x_acceleration = -1 * asteroids[k].x_acceleration;
+						asteroids[k].y_acceleration = -1 * asteroids[k].y_acceleration;
+					} else
+					if (variant == 3) {
+						asteroids[i].x_acceleration = -1 * asteroids[i].x_acceleration;
+						asteroids[i].y_acceleration = -1 * asteroids[i].y_acceleration;
+						asteroids[k].y_acceleration = -1 * asteroids[k].y_acceleration;
+					} else
+					if (variant == 4) {
+						asteroids[i].x_acceleration = -1 * asteroids[i].x_acceleration;
+						asteroids[i].y_acceleration = -1 * asteroids[i].y_acceleration;
+						asteroids[k].x_acceleration = -1 * asteroids[k].x_acceleration;
+					}
+					asteroids[i].x += asteroids[i].x_acceleration;
+					asteroids[i].y += asteroids[i].y_acceleration;
+					asteroids[k].x += asteroids[k].x_acceleration;
+					asteroids[k].y += asteroids[k].y_acceleration;
 				}
 			}
 		}
@@ -303,8 +365,8 @@ private:
 	int windows_x, windows_y;
 	Reticle reticle;
 	SpaceObject player;
-	vector<Bullet> bullets;
-	vector<Asteroid> asteroids;
+	std::vector<Bullet> bullets;
+	std::vector<Asteroid> asteroids;
 };
 
 int main(int argc, char* argv[])
