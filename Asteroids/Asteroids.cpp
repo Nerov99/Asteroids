@@ -82,6 +82,7 @@ public:
 	}
 
 	virtual bool Init() {
+		createBackground();
 		createPlayer();
 		createReticle();
 		createAsteroids();
@@ -91,23 +92,6 @@ public:
 
 	virtual void Close() {
 
-	}
-
-	void drawBackground() {
-		background = std::make_unique<SpaceObject>();
-		background->sprite = createSprite("data\\background.png");
-		int w, h;
-		getSpriteSize(background->sprite, w ,h);
-		int pos_x = 0;
-		int pos_y = 0;
-		for (size_t i = 0; i < windows_y / h + 1; ++i) {
-			for (size_t k = 0; k < windows_x / w + 1; ++k) {
-				drawSprite(background->sprite, pos_x, pos_y);
-				pos_x += w;
-			}
-			pos_x = 0;
-			pos_y += h;
-		}
 	}
 
 	virtual bool Tick() {
@@ -207,6 +191,11 @@ private:
 	std::vector<std::unique_ptr<Bullet>> bullets;
 	std::vector<std::unique_ptr<Asteroid>> asteroids;
 
+	void createBackground() {
+		background = std::make_unique<SpaceObject>();
+		background->sprite = createSprite("data\\background.png");
+	}
+
 	void createAsteroids() {
 		Rand_double rd{ 0, max_asteroid_speed };
 		srand((unsigned)time(0));
@@ -297,6 +286,21 @@ private:
 			return true;
 
 		return false;
+	}
+
+	void drawBackground() {
+		int w, h;
+		getSpriteSize(background->sprite, w, h);
+		int pos_x = 0;
+		int pos_y = 0;
+		for (size_t i = 0; i < windows_y / h + 1; ++i) {
+			for (size_t k = 0; k < windows_x / w + 1; ++k) {
+				drawSprite(background->sprite, pos_x, pos_y);
+				pos_x += w;
+			}
+			pos_x = 0;
+			pos_y += h;
+		}
 	}
 
 	void drawAsteroids() {
